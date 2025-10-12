@@ -1,0 +1,2 @@
+requests
+SQLAlchemy>=2.0
