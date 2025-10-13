@@ -1,4 +1,4 @@
-from __future__ import annotations
+from __future__ import annotations 
 
 import sys
 import re
@@ -21,6 +21,7 @@ from services.bet_service import (
 from services.settlement_service import (
     ensure_schema as ensure_settle_schema,
     cancel_pending_slip,
+    check_and_settle
 )
 try:
     from helpers.game_summary import print_summary
@@ -38,6 +39,14 @@ def init_db_and_wallet():
     reset_wallet(1000.0)
     bal = wallet_balance()
     print(f"\nWallet balance reset to: {bal:.2f} tokens\n")
+    
+    # Sweep any stale PENDING slips at startup
+    try:
+        checked, settled = check_and_settle()
+        if settled:
+            print(f"[settlement] Updated {settled} slip(s).\n")
+    except Exception as e:
+        print(f"[settlement] Skipped: {e}\n")
 
 
 def _parse_positive_float(raw: str) -> float | None:
@@ -71,7 +80,14 @@ def _print_games(games, title: str):
         print(" ", label)
     print()
 
+
 def action_cancel_pending_slip():
+    # Run a quick settlement sweep so "PENDING" list is accurate
+    try:
+        check_and_settle()
+    except Exception:
+        pass
+
     # Show current slips to pick from
     slips = list_pending_slips()
     print("\nCurrent slips (PENDING):\n")
@@ -257,6 +273,12 @@ def action_create_slip():
 
 
 def action_view_current_slips():
+    # Sweep first so the "pending" list is accurate
+    try:
+        check_and_settle()
+    except Exception:
+        pass
+
     slips = list_pending_slips()
     try:
         print("\nCurrent slips (PENDING):\n")
@@ -271,6 +293,12 @@ def action_view_current_slips():
 
 
 def action_view_settled_slips():
+    # Sweep first so settled shows the latest finals
+    try:
+        check_and_settle()
+    except Exception:
+        pass
+
     slips = list_settled_slips()
     try:
         print("\nSettled slips (WON/LOST/SETTLED):\n")
@@ -285,6 +313,12 @@ def action_view_settled_slips():
 
 
 def action_view_all_slips():
+    # Sweep first so the view is up to date
+    try:
+        check_and_settle()
+    except Exception:
+        pass
+
     slips = list_all_slips()
     try:
         print("\nAll slips (most recent first):\n")
