@@ -35,13 +35,6 @@ def _payout_multiplier(legs: int) -> float:
     return {1: 1.9, 3: 5.0, 5: 12.0, 7: 25.0}.get(legs, 1.0)
 
 def check_and_settle() -> tuple[int, int]:
-    """
-    For each PENDING slip:
-      - fetch summary for each leg's event_id
-      - mark leg result WIN/LOSS when final
-      - if all legs final: decide WON/LOST and mark SETTLED
-      - (optionally) credit payout if CREDIT_ON_WIN=True
-    """
     checked = 0
     settled = 0
 

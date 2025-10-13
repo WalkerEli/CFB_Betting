@@ -15,6 +15,8 @@ from services.bet_service import (
     ensure_schema as ensure_bet_schema,
     create_slip,
     list_pending_slips,
+    list_settled_slips,   
+    list_all_slips,       
 )
 from services.settlement_service import (
     ensure_schema as ensure_settle_schema,
@@ -24,13 +26,14 @@ try:
 except Exception:  # pragma: no cover
     print_summary = None  # type: ignore
 
+
 def init_db_and_wallet():
-    # Ensure tables exist in the existing storage.db
+    # ensure tables exist in the existing storage.db
     ensure_wallet_schema()
     ensure_bet_schema()
     ensure_settle_schema()
 
-    # Deterministic wallet each run
+    # deterministic wallet each run
     reset_wallet(1000.0)
     bal = wallet_balance()
     print(f"\nWallet balance reset to: {bal:.2f} tokens\n")
@@ -54,7 +57,7 @@ def _print_games(games, title: str):
         print("  (none)\n")
         return
     for g in games:
-        # If the model has a label method, prefer it
+        # if the model has a label method, prefer it
         try:
             label = g.label()
         except Exception:
@@ -69,7 +72,12 @@ def _print_games(games, title: str):
 
 
 def _fetch_upcoming_games():
-    sb = espn.get_scoreboard(week=None, seasontype=2)
+    # graceful if ESPN is down / rate-limiting
+    try:
+        sb = espn.get_scoreboard(week=None, seasontype=2)
+    except Exception as e:
+        print(f"\n[network] Could not load ESPN scoreboard: {e}\n")
+        return []
     games = list(espn.parse_games(sb))
     return espn.filter_upcoming_games(games)
 
@@ -97,11 +105,11 @@ def _choose_legs_from_upcoming(num_legs: int) -> List[Tuple[str, str]]:
             print("\nNo upcoming games available right now.\n")
             return []
 
-        # Show a numbered list
+        # show numbered list
         print(f"\nSelect game for Leg {leg_idx}:")
         numbered = []
         for i, g in enumerate(upcoming, start=1):
-            # Skip already-chosen games to avoid duplicate legs (optional; can allow if you prefer)
+            # skip already-chosen games to avoid duplicate legs (optional; can allow if you prefer)
             if getattr(g, "event_id", None) in used_event_ids:
                 continue
             try:
@@ -117,13 +125,12 @@ def _choose_legs_from_upcoming(num_legs: int) -> List[Tuple[str, str]]:
 
         valid_numbers = [i for (i, _g) in numbered]
         idx = _prompt_numeric_choice(f"Pick 1–{max(valid_numbers)}: ", min(valid_numbers), max(valid_numbers))
-        # Map idx to game (could have gaps if we skipped duplicates; search tuple list)
         selected = next((g for (i, g) in numbered if i == idx), None)
         if selected is None:
             print("Invalid selection; try again.")
             return _choose_legs_from_upcoming(num_legs - (leg_idx - 1))  # restart remaining
 
-        # Winner choice
+        # winner choice
         print(f"\nWho wins?\n  1) {selected.home_team}\n  2) {selected.away_team}")
         win_choice = _prompt_numeric_choice("Select 1 or 2: ", 1, 2)
         pick_team = selected.home_team if win_choice == 1 else selected.away_team
@@ -140,7 +147,7 @@ def action_list_upcoming_games():
 
 
 def action_view_previous_by_week():
-    raw = input("Enter ESPN week number (1...20 regular season): ").strip()
+    raw = input("Enter ESPN week number (current regular season): ").strip()
     if not raw.isdigit():
         print("Invalid week.\n")
         return
@@ -176,12 +183,13 @@ def action_show_top25():
             if r.previous is not None and r.previous != 0:
                 move = r.previous - r.rank
                 if move > 0:
-                    delta = f" (↑{move})"
+                    delta = f" (+{move})"
                 elif move < 0:
-                    delta = f" (↓{-move})"
+                    delta = f" (-{-move})"
             print(f"   {r.rank:>2}. {r.team_name}{delta}")
             shown_count += 1
     print()
+
 
 def action_create_slip():
     # Show wallet in the UI (display only)
@@ -228,7 +236,38 @@ def action_create_slip():
 def action_view_current_slips():
     slips = list_pending_slips()
     try:
-        print("\nPending slips:\n")
+        print("\nCurrent slips (PENDING):\n")
+        if not slips:
+            print("  (none)\n")
+            return
+        for s in slips:
+            print(f"  Slip #{s.id}  legs={s.legs_count}  stake={s.stake_tokens:.2f}  status={s.status.value}\n")
+    except Exception as e:
+        print(f"(Could not print slips: {e})\n")
+        return
+
+
+def action_view_settled_slips():
+    slips = list_settled_slips()
+    try:
+        print("\nSettled slips (WON/LOST/SETTLED):\n")
+        if not slips:
+            print("  (none)\n")
+            return
+        for s in slips:
+            print(f"  Slip #{s.id}  legs={s.legs_count}  stake={s.stake_tokens:.2f}  status={s.status.value}\n")
+    except Exception as e:
+        print(f"(Could not print slips: {e})\n")
+        return
+
+
+def action_view_all_slips():
+    slips = list_all_slips()
+    try:
+        print("\nAll slips (most recent first):\n")
+        if not slips:
+            print("  (none)\n")
+            return
         for s in slips:
             print(f"  Slip #{s.id}  legs={s.legs_count}  stake={s.stake_tokens:.2f}  status={s.status.value}\n")
     except Exception as e:
@@ -248,6 +287,8 @@ College Football CLI
 3) Show Top 25 (live)
 4) Create a bet slip (no wallet debit; status=PENDING)
 5) View current slips (pending)
+6) View settled slips
+7) View all slips
 0) Exit
 --------------------------------------------------------------------------------
 Select: """
@@ -276,6 +317,10 @@ def main():
             action_create_slip()
         elif choice == "5":
             action_view_current_slips()
+        elif choice == "6":
+            action_view_settled_slips()
+        elif choice == "7":
+            action_view_all_slips()
         else:
             print("Invalid choice.\n")
 

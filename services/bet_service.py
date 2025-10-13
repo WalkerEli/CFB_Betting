@@ -7,12 +7,6 @@ def ensure_schema():
     Base.metadata.create_all(engine)
 
 def create_slip(legs_input: Sequence[tuple[str, str]], stake_tokens: float) -> tuple[BetSlip | None, str]:
-    """
-    Simplified:
-    - NO wallet checks
-    - NO debit
-    - Just record a PENDING slip + legs
-    """
     n = len(legs_input)
     if n not in ALLOWED_LEGS:
         return None, f"Leg count must be one of {sorted(ALLOWED_LEGS)}."

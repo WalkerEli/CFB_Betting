@@ -6,11 +6,6 @@ from models.ranking import Ranking
 BASE = "https://site.api.espn.com/apis/site/v2/sports/football/college-football"
 
 def get_scoreboard(week: int | None = None, seasontype: int = 2, dates: str | None = None) -> dict:
-    """
-    seasontype: 2=regular season, 3=postseason
-    week: ESPN week number (optional)
-    dates: YYYYMMDD or range; optional alternative to week
-    """
     params = {"seasontype": seasontype}
     if week is not None:
         params["week"] = week
