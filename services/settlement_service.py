@@ -13,6 +13,51 @@ def _credit_if_enabled(amount: float, reason: str):
 
 def ensure_schema():
     Base.metadata.create_all(engine)
+    
+def _all_legs_pre_game(slip: BetSlip) -> tuple[bool, str | None]:
+    legs = getattr(slip, "legs", []) or []
+    if not legs:
+        return True, None
+
+    for leg in legs:
+        try:
+            summary = espn.get_summary(leg.event_id)
+            comps = (summary.get("header") or {}).get("competitions") or []
+            comp = comps[0] if comps else {}
+            state = (((comp.get("status") or {}).get("type") or {}).get("state") or "").lower()
+            # ESPN values: 'pre' (not started), 'in' (in progress), 'post' (finished)
+            if state != "pre":
+                return False, f"leg {getattr(leg, 'id', '?')} is '{state}'"
+        except Exception as e:
+            return False, f"could not verify leg {getattr(leg, 'id', '?')}: {e}"
+    return True, None
+
+
+def cancel_pending_slip(slip_id: int) -> tuple[bool, str]:
+    with SessionLocal() as db:
+        slip = db.get(BetSlip, slip_id)
+        if not slip:
+            return False, "Slip not found."
+
+        status_val = getattr(slip.status, "value", str(slip.status)).upper()
+        if status_val != "PENDING":
+            return False, "Slip is not pending and cannot be canceled."
+
+        ok, reason = _all_legs_pre_game(slip)
+        if not ok:
+            return False, f"Slip is locked (game underway or finished): {reason or ''}"
+
+        try:
+            # delete legs first unless cascade is configured.
+            for leg in list(getattr(slip, "legs", []) or []):
+                db.delete(leg)
+            db.delete(slip)
+            db.commit()
+            return True, f"Slip #{slip_id} canceled."
+        except Exception as e:
+            db.rollback()
+            return False, f"Failed to cancel slip: {e}"
+
 
 def _winner_from_summary(summary_json: dict) -> tuple[str | None, bool]:
     comps = (summary_json.get("header") or {}).get("competitions") or []

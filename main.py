@@ -20,6 +20,7 @@ from services.bet_service import (
 )
 from services.settlement_service import (
     ensure_schema as ensure_settle_schema,
+    cancel_pending_slip,
 )
 try:
     from helpers.game_summary import print_summary
@@ -69,6 +70,28 @@ def _print_games(games, title: str):
             label = f"[{getattr(g, 'status', 'TBD')}] {g.away_team} @ {g.home_team} ({score})  {getattr(g, 'start', '')}"
         print(" ", label)
     print()
+
+def action_cancel_pending_slip():
+    # Show current slips to pick from
+    slips = list_pending_slips()
+    print("\nCurrent slips (PENDING):\n")
+    if not slips:
+        print("  (none)\n")
+        return
+    for s in slips:
+        print(f"  Slip #{s.id}  legs={s.legs_count}  stake={s.stake_tokens:.2f}  status={s.status.value}")
+    print()
+
+    raw = input("Enter the slip # to cancel (or press Enter to abort): ").strip()
+    if not raw:
+        print("Canceled.\n")
+        return
+    if not raw.isdigit():
+        print("Invalid slip #.\n")
+        return
+
+    ok, msg = cancel_pending_slip(int(raw))
+    print(("\n" + msg + "\n"))
 
 
 def _fetch_upcoming_games():
@@ -282,13 +305,14 @@ def action_view_all_slips():
 MENU = """--------------------------------------------------------------------------------
 College Football CLI
 --------------------------------------------------------------------------------
-1) List upcoming games (current week, live)
-2) View previous games by week (live)
+1) List upcoming games (live)
+2) View previous games by week 
 3) Show Top 25 (live)
-4) Create a bet slip (no wallet debit; status=PENDING)
+4) Create a bet slip (1, 3, 5, or 7 legs)
 5) View current slips (pending)
-6) View settled slips
+6) View settled slips (won/lost/settled)
 7) View all slips
+8) Cancel a pending slip (if no legs underway)
 0) Exit
 --------------------------------------------------------------------------------
 Select: """
@@ -321,6 +345,8 @@ def main():
             action_view_settled_slips()
         elif choice == "7":
             action_view_all_slips()
+        elif choice == "8":
+            action_cancel_pending_slip()
         else:
             print("Invalid choice.\n")
 
