@@ -46,3 +46,15 @@ When the program started, previously settled slips were not being reflected corr
 
 **Solution:**  
 Added an automatic settlement check in `init_db_and_wallet()` to ensure the wallet and slips are up-to-date upon program launch.
+
+### 5. **CLI Needs Update**
+**Issue:**  
+The CLI for this application needs to be easier to read and navigate through.
+**Solution:**  
+Update the CLI layout for a cleaner/better look.
+
+### 6. **Main.py Congestion**
+**Issue:**  
+The main.py file is rather cluttered.
+**Solution:**  
+Move the CLI menu and the actions to the helpers folder. Call the two files actions.py and menu.py then import them into the main.py script.
