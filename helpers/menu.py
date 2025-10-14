@@ -1,4 +1,3 @@
-# helpers/menu.py
 from __future__ import annotations
 
 import os
@@ -85,7 +84,7 @@ def print_menu(wallet_balance_fn) -> None:
     print("3) Show Top 25 (live)")
     print("4) Create a bet slip (1, 3, 5, or 7 legs)")
     print("5) View current slips (pending)")
-    print("6) View settled slips (won/lost/settled)")
+    print("6) View settled slips (pending/settled)")
     print("7) View all slips")
     print("8) Cancel a pending slip (if no legs underway)")
     print("0) Exit")
