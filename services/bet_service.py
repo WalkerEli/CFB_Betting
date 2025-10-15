@@ -3,10 +3,11 @@ from sqlalchemy import select
 from models.base import SessionLocal, Base, engine
 from models.bet import BetSlip, BetLeg, ALLOWED_LEGS
 
-def ensure_schema():
+def ensure_schema():    # create tables if not exist
     Base.metadata.create_all(engine)
-
-def create_slip(legs_input: Sequence[tuple[str, str]], stake_tokens: float) -> tuple[BetSlip | None, str]:
+    
+# (event_id, pick_team_name)
+def create_slip(legs_input: Sequence[tuple[str, str]], stake_tokens: float) -> tuple[BetSlip | None, str]:  
     n = len(legs_input)
     if n not in ALLOWED_LEGS:
         return None, f"Leg count must be one of {sorted(ALLOWED_LEGS)}."
@@ -27,10 +28,10 @@ def create_slip(legs_input: Sequence[tuple[str, str]], stake_tokens: float) -> t
         db.refresh(slip)
         return slip, "OK"
 
-def list_pending_slips():
+def list_pending_slips():   
     with SessionLocal() as db:
-        stmt = select(BetSlip).where(BetSlip.status == "PENDING").order_by(BetSlip.created_at.asc())
-        return list(db.scalars(stmt))
+        stmt = select(BetSlip).where(BetSlip.status == "PENDING").order_by(BetSlip.created_at.asc())  
+        return list(db.scalars(stmt))  
     
 def list_settled_slips(limit: int = 50):
     with SessionLocal() as db:

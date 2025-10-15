@@ -2,7 +2,7 @@ from sqlalchemy import String, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 from .base import Base
 
-class Ranking(Base):
+class Ranking(Base):    # college football ranking entry
     __tablename__ = "rankings"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

@@ -1,5 +1,7 @@
 import espn
 
+
+# simple helper to print a summary of an concluded event
 def print_summary(event_id: str):
     data = espn.get_summary(event_id)
     header = (data.get("header") or {})
@@ -16,5 +18,5 @@ def print_summary(event_id: str):
         team = (c.get("team") or {}).get("displayName")
         score = c.get("score")
         homeAway = c.get("homeAway")
-        winner = "✓" if c.get("winner") else ""
+        winner = "" if c.get("winner") else ""
         print(f"{homeAway:<5} {team:<32} {score:>4} {winner}")

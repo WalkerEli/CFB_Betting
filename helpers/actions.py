@@ -10,6 +10,7 @@ from services.wallet_service import (
     reset_wallet,
     balance as wallet_balance,
 )
+
 from services.bet_service import (
     ensure_schema as ensure_bet_schema,
     create_slip,
@@ -17,6 +18,7 @@ from services.bet_service import (
     list_settled_slips,
     list_all_slips,
 )
+
 from services.settlement_service import (
     ensure_schema as ensure_settle_schema,
     cancel_pending_slip,
@@ -38,31 +40,34 @@ except Exception:  # pragma: no cover
     print_summary = None  # type: ignore
 
 
-
-
 def init_db_and_wallet() -> None:
+    # make sure all tables exist
     ensure_wallet_schema()
     ensure_bet_schema()
     ensure_settle_schema()
 
+    # reset demo wallet to a starting balance
     reset_wallet(1000.0)
     bal = wallet_balance()
 
+    # show confirmation to the user
     title("Initialized Database and Wallet")
     kv("Wallet balance reset to", f"{bal:.2f} tokens")
+
+    # try to settle any slips if games finished
     try:
         _checked, settled = check_and_settle()
         if settled:
             print(f"[settlement] Updated {settled} slip(s).\n")
     except Exception as e:
+        # settlement issues should not block startup
         print(f"[settlement] Skipped: {e}\n")
 
 
-# ------------------------------
-# Internal helpers
-# ------------------------------
+# internal helpers
 
 def _parse_positive_float(raw: str) -> float | None:
+    # normalize input like "$1,234.50" -> "1234.50"
     s = (raw or "").strip().replace(",", "").replace("$", "")
     m = re.match(r"^([-+]?[0-9]*\.?[0-9]+)", s)
     if not m:
@@ -74,6 +79,7 @@ def _parse_positive_float(raw: str) -> float | None:
         return None
 
 def _fetch_upcoming_games():
+    # pull current regular-season scoreboard and filter to upcoming
     try:
         sb = espn.get_scoreboard(week=None, seasontype=2)
     except Exception as e:
@@ -83,6 +89,7 @@ def _fetch_upcoming_games():
     return espn.filter_upcoming_games(games)
 
 def _prompt_numeric_choice(label: str, lo: int, hi: int) -> int:
+    # loop until the user enters a valid integer in range
     while True:
         raw = prompt(label)
         if not raw.isdigit():
@@ -95,6 +102,7 @@ def _prompt_numeric_choice(label: str, lo: int, hi: int) -> int:
         return idx
 
 def _choose_legs_from_upcoming(num_legs: int) -> List[Tuple[str, str]]:
+    # build a list of (event_id, picked_team) for the slip
     legs: List[Tuple[str, str]] = []
     used_event_ids: set[str] = set()
 
@@ -107,13 +115,13 @@ def _choose_legs_from_upcoming(num_legs: int) -> List[Tuple[str, str]]:
         section(f"Select game for Leg {leg_idx}")
         numbered = []
         for i, g in enumerate(upcoming, start=1):
+            # avoid picking the same event twice
             if getattr(g, "event_id", None) in used_event_ids:
                 continue
             try:
                 label = g.label()
             except Exception:
-                # fall back to menu’s formatter via print_games (handled there),
-                # but here we just show the label from g if available
+                # fallback formatting via menu helper when g.label() fails
                 from helpers.menu import _format_game_line as _fmt  # local import to avoid exporting it
                 label = _fmt(g)
             print(f"  {i:>2}) {label}")
@@ -123,13 +131,16 @@ def _choose_legs_from_upcoming(num_legs: int) -> List[Tuple[str, str]]:
             print("No selectable games remaining.\n")
             return []
 
+        # let the user select a game by list index
         valid_numbers = [i for (i, _g) in numbered]
         idx = _prompt_numeric_choice(f"Pick 1–{max(valid_numbers)}: ", min(valid_numbers), max(valid_numbers))
         selected = next((g for (i, g) in numbered if i == idx), None)
         if selected is None:
             print("Invalid selection; try again.")
-            return _choose_legs_from_upcoming(num_legs - (leg_idx - 1))  # restart remaining
+            # restart the remaining legs if selection failed
+            return _choose_legs_from_upcoming(num_legs - (leg_idx - 1))
 
+        # ask for the winner (home or away)
         print("\nWho wins?")
         print(f"  1) {selected.home_team}")
         print(f"  2) {selected.away_team}")
@@ -142,15 +153,15 @@ def _choose_legs_from_upcoming(num_legs: int) -> List[Tuple[str, str]]:
     return legs
 
 
-# ------------------------------
-# Public actions
-# ------------------------------
+# public actions
 
 def action_list_upcoming_games() -> None:
+    # show upcoming games for the current week
     upcoming = _fetch_upcoming_games()
     print_games(upcoming, "Upcoming Games (current week)")
 
 def action_view_previous_by_week() -> None:
+    # show final games for a specific week
     section("Previous Games By Week")
     raw = prompt("Enter ESPN week number (current regular season): ")
     if not raw.isdigit():
@@ -163,6 +174,7 @@ def action_view_previous_by_week() -> None:
     print_games(finished, f"Previous / Final Games — Week {week}")
 
 def action_show_top25() -> None:
+    # pull and print top 25 rankings (ap first if present)
     rjson = espn.get_rankings()
     rankings = list(espn.parse_rankings(rjson))
     ap = [r for r in rankings if (r.poll or "").lower().startswith("ap top 25")]
@@ -172,7 +184,8 @@ def action_show_top25() -> None:
         print_empty()
         return
 
-    def key_poll(r): 
+    # sort ap to the top, then by rank
+    def key_poll(r):
         return (0 if (r.poll or "").lower().startswith("ap top 25") else 1, r.rank)
 
     rows = sorted(rows, key=key_poll)
@@ -185,6 +198,7 @@ def action_show_top25() -> None:
             print("  " + ("-" * 30))
             shown_count = 0
         if shown_count < 25:
+            # show movement vs previous rank if present
             delta = ""
             if r.previous is not None and r.previous != 0:
                 move = r.previous - r.rank
@@ -197,11 +211,13 @@ def action_show_top25() -> None:
     print()
 
 def action_create_slip() -> None:
+    # start slip creation flow
     bal = wallet_balance()
     section("Create Slip")
     kv("Wallet (display only)", f"{bal:.2f} tokens")
     print("\nAllowed legs: 1, 3, 5, 7")
 
+    # get a valid leg count
     while True:
         raw = prompt("How many legs? ")
         if not raw.isdigit():
@@ -213,17 +229,20 @@ def action_create_slip() -> None:
             continue
         break
 
+    # choose legs from upcoming games
     legs = _choose_legs_from_upcoming(n)
     if len(legs) != n:
         print("Could not build all legs (perhaps no upcoming games). Try again later.\n")
         return
 
+    # get stake (display only for now)
     raw = prompt("\nEnter stake (tokens, display only): ")
     stake = _parse_positive_float(raw)
     if stake is None:
         print("Invalid stake; enter a positive number.\n")
         return
 
+    # attempt to create the slip
     slip, msg = create_slip(legs, stake)
     if slip is None:
         print("Failed to create slip:", msg, "\n")
@@ -235,6 +254,7 @@ def action_create_slip() -> None:
     )
 
 def action_view_current_slips() -> None:
+    # settle any that finished, then show pending
     try:
         check_and_settle()
     except Exception:
@@ -250,6 +270,7 @@ def action_view_current_slips() -> None:
         print(f"  Slip #{s.id}  legs={s.legs_count}  stake={s.stake_tokens:.2f}  status={s.status.value}\n")
 
 def action_view_settled_slips() -> None:
+    # settle any that finished, then show resolved
     try:
         check_and_settle()
     except Exception:
@@ -265,6 +286,7 @@ def action_view_settled_slips() -> None:
         print(f"  Slip #{s.id}  legs={s.legs_count}  stake={s.stake_tokens:.2f}  status={s.status.value}\n")
 
 def action_view_all_slips() -> None:
+    # settle any that finished, then show everything
     try:
         check_and_settle()
     except Exception:
@@ -280,6 +302,7 @@ def action_view_all_slips() -> None:
         print(f"  Slip #{s.id}  legs={s.legs_count}  stake={s.stake_tokens:.2f}  status={s.status.value}\n")
 
 def action_cancel_pending_slip() -> None:
+    # settle any that finished, then allow cancel of pending
     try:
         check_and_settle()
     except Exception:
@@ -295,6 +318,7 @@ def action_cancel_pending_slip() -> None:
         print(f"  Slip #{s.id}  legs={s.legs_count}  stake={s.stake_tokens:.2f}  status={s.status.value}")
     print()
 
+    # prompt which slip to cancel
     raw = prompt("Enter the slip # to cancel (or press Enter to abort): ")
     if not raw:
         print("Canceled.\n")

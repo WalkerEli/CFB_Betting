@@ -2,7 +2,7 @@ from sqlalchemy import String, Integer, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from .base import Base
 
-class Game(Base):
+class Game(Base):   # college football game table
     __tablename__ = "games"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

@@ -10,7 +10,7 @@ def ensure_schema():
     Base.metadata.create_all(engine)
 
 
-def _get_wallet(db, owner: str = DEFAULT_OWNER) -> Wallet:
+def _get_wallet(db, owner: str = DEFAULT_OWNER) -> Wallet:  # get or create wallet for owner
     w = db.scalar(select(Wallet).where(Wallet.owner == owner))
     if not w:
         w = Wallet(owner=owner, balance=0.0)
@@ -20,11 +20,7 @@ def _get_wallet(db, owner: str = DEFAULT_OWNER) -> Wallet:
     return w
 
 
-def reset_wallet(target_amount: float, owner: str = DEFAULT_OWNER) -> None:
-    """
-    Set wallet balance to 'target_amount' every time the app starts.
-    Writes a single WalletTx for the delta (audit-friendly), but keeps it simple.
-    """
+def reset_wallet(target_amount: float, owner: str = DEFAULT_OWNER) -> None:     # reset wallet balance to target amount (for testing/demo purposes)
     with SessionLocal() as db:
         w = _get_wallet(db, owner)
         target = float(target_amount)
@@ -44,7 +40,7 @@ def reset_wallet(target_amount: float, owner: str = DEFAULT_OWNER) -> None:
         db.commit()
 
 
-def credit(amount: float, reason: str = "", owner: str = DEFAULT_OWNER) -> bool:
+def credit(amount: float, reason: str = "", owner: str = DEFAULT_OWNER) -> bool:   # credit wallet by amount; returns success
     try:
         amt = float(amount)
     except Exception:
@@ -61,10 +57,7 @@ def credit(amount: float, reason: str = "", owner: str = DEFAULT_OWNER) -> bool:
         return True
 
 
-def debit(amount: float, reason: str = "", owner: str = DEFAULT_OWNER) -> bool:
-    """
-    Kept for completeness but NOT used in simplified flow.
-    """
+def debit(amount: float, reason: str = "", owner: str = DEFAULT_OWNER) -> bool:  # debit wallet by amount if sufficient funds; returns success
     try:
         amt = float(amount)
     except Exception:
@@ -83,13 +76,13 @@ def debit(amount: float, reason: str = "", owner: str = DEFAULT_OWNER) -> bool:
         return True
 
 
-def balance(owner: str = DEFAULT_OWNER) -> float:
+def balance(owner: str = DEFAULT_OWNER) -> float:   # get current wallet balance
     with SessionLocal() as db:
         w = db.scalar(select(Wallet).where(Wallet.owner == owner))
         return float(w.balance if w else 0.0)
 
 
-def history(limit: int = 50, owner: str = DEFAULT_OWNER):
+def history(limit: int = 50, owner: str = DEFAULT_OWNER):  # get recent wallet transactions, most recent first
     with SessionLocal() as db:
         stmt = (
             select(WalletTx)

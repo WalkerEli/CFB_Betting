@@ -3,24 +3,24 @@ from models.base import SessionLocal, Base, engine
 from models.bet import BetSlip, BetLeg, SlipStatus, LegResult
 import espn
 
-CREDIT_ON_WIN = False
+CREDIT_ON_WIN = False   # set to True to enable automatic crediting on wins (for testing/demo can be enabled later)
 
-def _credit_if_enabled(amount: float, reason: str):
+def _credit_if_enabled(amount: float, reason: str): # credit wallet if enabled
     if not CREDIT_ON_WIN:
         return
     from services.wallet_service import credit
     credit(amount, reason)
 
-def ensure_schema():
+def ensure_schema():    # create tables if not exist
     Base.metadata.create_all(engine)
     
-def _all_legs_pre_game(slip: BetSlip) -> tuple[bool, str | None]:
+def _all_legs_pre_game(slip: BetSlip) -> tuple[bool, str | None]:   # check if all legs are pre-game
     legs = getattr(slip, "legs", []) or []
     if not legs:
         return True, None
 
     for leg in legs:
-        try:
+        try:    # use espn.py helper to get game summary
             summary = espn.get_summary(leg.event_id)
             comps = (summary.get("header") or {}).get("competitions") or []
             comp = comps[0] if comps else {}
@@ -33,7 +33,7 @@ def _all_legs_pre_game(slip: BetSlip) -> tuple[bool, str | None]:
     return True, None
 
 
-def cancel_pending_slip(slip_id: int) -> tuple[bool, str]:
+def cancel_pending_slip(slip_id: int) -> tuple[bool, str]:  # cancel a pending slip if all legs are pre-game
     with SessionLocal() as db:
         slip = db.get(BetSlip, slip_id)
         if not slip:
@@ -59,7 +59,7 @@ def cancel_pending_slip(slip_id: int) -> tuple[bool, str]:
             return False, f"Failed to cancel slip: {e}"
 
 
-def _winner_from_summary(summary_json: dict) -> tuple[str | None, bool]:
+def _winner_from_summary(summary_json: dict) -> tuple[str | None, bool]:    # extract winner team name and finality from espn summary JSON
     comps = (summary_json.get("header") or {}).get("competitions") or []
     if not comps:
         return None, False
@@ -76,22 +76,22 @@ def _winner_from_summary(summary_json: dict) -> tuple[str | None, bool]:
             break
     return winner, is_final
 
-def _payout_multiplier(legs: int) -> float:
+def _payout_multiplier(legs: int) -> float:  # simple fixed odds based on legs count
     return {1: 1.9, 3: 5.0, 5: 12.0, 7: 25.0}.get(legs, 1.0)
 
-def check_and_settle() -> tuple[int, int]:
+def check_and_settle() -> tuple[int, int]:      # check all pending slips and settle if possible; returns (checked, settled) counts
     checked = 0
     settled = 0
 
     with SessionLocal() as db:
-        slips = list(db.scalars(select(BetSlip).where(BetSlip.status == SlipStatus.PENDING)))
+        slips = list(db.scalars(select(BetSlip).where(BetSlip.status == SlipStatus.PENDING)))   # get all pending slips
         for slip in slips:
             checked += 1
             all_final = True
             wins = losses = 0
 
-            for leg in slip.legs:
-                if leg.result in (LegResult.WIN, LegResult.LOSS):
+            for leg in slip.legs:   # check each leg
+                if leg.result in (LegResult.WIN, LegResult.LOSS):   # already decided
                     if leg.result == LegResult.WIN:
                         wins += 1
                     else:
@@ -104,20 +104,19 @@ def check_and_settle() -> tuple[int, int]:
                     all_final = False
                     continue
 
-                if winner and (winner == leg.pick_team_name):
+                if winner and (winner == leg.pick_team_name):   # user picked correctly
                     leg.result = LegResult.WIN
                     wins += 1
                 else:
-                    leg.result = LegResult.LOSS
+                    leg.result = LegResult.LOSS # user picked incorrectly or no winner found
                     losses += 1
                 db.add(leg)
 
             if all_final:
-                needed = (slip.legs_count // 2) + 1
+                needed = (slip.legs_count // 2) + 1     # strictly more than 50%
                 if wins >= needed:
                     slip.status = SlipStatus.WON
-                    # Optionally credit if desired:
-                    if CREDIT_ON_WIN:
+                    if CREDIT_ON_WIN:   # auto credit if enabled
                         payout = round(slip.stake_tokens * _payout_multiplier(slip.legs_count), 2)
                         _credit_if_enabled(payout, f"Payout for {slip.legs_count}-leg slip #{slip.id}")
                 else:

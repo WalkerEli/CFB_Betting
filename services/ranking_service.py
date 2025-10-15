@@ -5,7 +5,7 @@ from models.base import SessionLocal, Base, engine
 from models.ranking import Ranking
 
 
-def replace_rankings(new_ranks: Iterable[Ranking]):
+def replace_rankings(new_ranks: Iterable[Ranking]):  # replace existing rankings with new ones
     with SessionLocal() as db:
         for r in new_ranks:
             db.execute(
@@ -19,7 +19,7 @@ def replace_rankings(new_ranks: Iterable[Ranking]):
         db.commit()
 
 
-def get_rankings(poll: str | None = None, season_year: int | None = None, week: int | None = None):
+def get_rankings(poll: str | None = None, season_year: int | None = None, week: int | None = None): # get rankings with optional filters
     with SessionLocal() as db:
         stmt = select(Ranking)
         if poll:
