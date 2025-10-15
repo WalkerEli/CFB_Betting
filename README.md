@@ -58,3 +58,9 @@ Update the CLI layout for a cleaner/better look.
 The main.py file is rather cluttered.
 **Solution:**  
 Move the CLI menu and the actions to the helpers folder. Call the two files actions.py and menu.py then import them into the main.py script.
+
+### 7. **Update Comments** 
+**Issue:** 
+Comments dont make a lot of sense because they were only for me to remember what I was last doing instead of explaining what the code is doing.
+**Solution:**
+Clean up comments on code and make them more robust for others to make sense of my code.

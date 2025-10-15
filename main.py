@@ -16,15 +16,12 @@ from helpers.actions import (
     action_cancel_pending_slip,
 )
 
-MENU_PROMPT = "Select: "
-
 def main():
     init_db_and_wallet()
-
     while True:
         try:
             print_menu(wallet_balance)
-            choice = input(MENU_PROMPT).strip()
+            choice = input("Select: ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nGoodbye!")
             sys.exit(0)
