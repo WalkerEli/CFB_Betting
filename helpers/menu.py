@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+# import standard modules
 import os
 from datetime import datetime
 from typing import Any, Iterable
 
+# get terminal width safely, with fallback
 def term_width(default: int = 78) -> int:
     try:
         return max(60, min(120, os.get_terminal_size().columns))
     except Exception:
         return default
 
+# create a horizontal line for ui
 def line(ch: str = "-") -> str:
     return ch * term_width()
 
+# print a formatted title bar
 def title(text: str) -> None:
     width = term_width()
     print("\n" + "=" * width)
@@ -20,16 +24,20 @@ def title(text: str) -> None:
     print(centered)
     print("=" * width)
 
+# print section header with divider
 def section(text: str) -> None:
     print("\n" + text)
     print(line("-"))
 
+# print key-value formatted line
 def kv(label: str, value: str) -> None:
     print(f"{label:<22}: {value}")
 
+# simple input wrapper
 def prompt(label: str) -> str:
     return input(label).strip()
 
+# helper to format game info line
 def _format_game_line(g: Any) -> str:
     status = f"{getattr(g, 'status', 'TBD')}".ljust(9)[:9]
     try:
@@ -39,6 +47,7 @@ def _format_game_line(g: Any) -> str:
         home = getattr(g, "home_team", "HOME")
         away = getattr(g, "away_team", "AWAY")
 
+    # default score text
     score = "vs"
     try:
         a = getattr(g, "away_score", None)
@@ -51,6 +60,7 @@ def _format_game_line(g: Any) -> str:
     start = f"{getattr(g, 'start', '')}"
     return f"[{status}]  {away} @ {home}  ({score})  {start}"
 
+# print a list of games with header
 def print_games(games: Iterable[Any], header: str) -> None:
     section(header)
     empty = True
@@ -65,9 +75,11 @@ def print_games(games: Iterable[Any], header: str) -> None:
         print("  (none)")
     print()
 
+# print a placeholder for empty data
 def print_empty(parenthetical: str = "(none)") -> None:
     print(f"  {parenthetical}\n")
 
+# print the main cli menu
 def print_menu(wallet_balance_fn) -> None:
     # wallet_balance_fn is injected so we don't import services here
     title("College Football CLI")

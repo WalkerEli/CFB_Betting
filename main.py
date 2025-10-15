@@ -16,7 +16,8 @@ from helpers.actions import (
     action_cancel_pending_slip,
 )
 
-def main():
+# main loop
+def main(): 
     init_db_and_wallet()
     while True:
         try:
@@ -48,5 +49,5 @@ def main():
         else:
             print("Invalid choice.\n")
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # run loop
     main()

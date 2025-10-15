@@ -5,7 +5,7 @@ from models.ranking import Ranking
 
 BASE = "https://site.api.espn.com/apis/site/v2/sports/football/college-football"
 
-def get_scoreboard(week: int | None = None, seasontype: int = 2, dates: str | None = None) -> dict:
+def get_scoreboard(week: int | None = None, seasontype: int = 2, dates: str | None = None) -> dict: # get scoreboard JSON from ESPN; seasontype=2 for regular season, 3 for postseason
     params = {"seasontype": seasontype}
     if week is not None:
         params["week"] = week
@@ -15,7 +15,7 @@ def get_scoreboard(week: int | None = None, seasontype: int = 2, dates: str | No
     r.raise_for_status()
     return r.json()
 
-def get_summary(event_id: str) -> dict:
+def get_summary(event_id: str) -> dict:  # get game summary JSON from ESPN for a given event ID
     r = requests.get(f"{BASE}/summary", params={"event": event_id}, timeout=20)
     r.raise_for_status()
     return r.json()
@@ -25,7 +25,7 @@ def get_rankings() -> dict:
     r.raise_for_status()
     return r.json()
 
-def parse_games(sb_json: dict) -> Iterable[Game]:
+def parse_games(sb_json: dict) -> Iterable[Game]:   # parse games from ESPN scoreboard JSON
     season_year = (sb_json.get("season") or {}).get("year")
     week = ((sb_json.get("week") or {}) or {}).get("number")
     events = (sb_json.get("events") or []) or []
@@ -64,7 +64,7 @@ def parse_games(sb_json: dict) -> Iterable[Game]:
             away_score=away[1],
         )
 
-def parse_rankings(r_json: dict) -> Iterable[Ranking]:
+def parse_rankings(r_json: dict) -> Iterable[Ranking]:  # parse rankings from ESPN rankings JSON
     season_year = (r_json.get("season") or {}).get("year")
     for poll_entry in (r_json.get("rankings") or []):
         poll_name = poll_entry.get("name") or "Unknown Poll"
@@ -92,31 +92,27 @@ def parse_rankings(r_json: dict) -> Iterable[Ranking]:
                 first_place_votes=r.get("firstPlaceVotes"),
             )
 
-def _is_upcoming_status(s: str) -> bool:
+def _is_upcoming_status(s: str) -> bool:    # determine if a game status string indicates an upcoming (not started) game
     s = (s or "").lower()
     # ESPN strings seen for not-started games
     return ("sched" in s) or ("pre" in s) or ("upcoming" in s) or ("not started" in s)
 
-def _is_final_status(s: str) -> bool:
+def _is_final_status(s: str) -> bool:   # determine if a game status string indicates a final/finished game
     s = (s or "").lower()
     return ("final" in s) or ("post" in s) or ("end" in s)
 
-def filter_upcoming_games(games: Iterable[Game]) -> List[Game]:
+def filter_upcoming_games(games: Iterable[Game]) -> List[Game]:  # filter games to only those that are upcoming (not started)
     return [g for g in games if _is_upcoming_status(g.status)]
 
-def filter_previous_games(games: Iterable[Game]) -> List[Game]:
+def filter_previous_games(games: Iterable[Game]) -> List[Game]: # filter games to only those that are final/finished
     return [g for g in games if _is_final_status(g.status)]
 
-def fetch_week_games(week: int | None, seasontype: int = 2) -> List[Game]:
+def fetch_week_games(week: int | None, seasontype: int = 2) -> List[Game]:  # fetch and parse games for a given week and season type (2=regular, 3=postseason)
     sb = get_scoreboard(week=week, seasontype=seasontype)
     return list(parse_games(sb))
 
-def extract_top25_from_rankings(r_json: dict) -> List[Tuple[int, str, str]]:
-    """
-    Returns list of (rank, team_name, poll_name) for AP Top 25 (or first 25 of first FBS poll).
-    """
+def extract_top25_from_rankings(r_json: dict) -> List[Tuple[int, str, str]]:  # extract top 25 rankings as (rank, team_name, poll_name) tuples from ESPN rankings JSON
     rankings = r_json.get("rankings") or []
-    # Prefer AP Top 25, else AFCA Coaches Poll
     preferred_order = ["AP Top 25", "AFCA Coaches Poll"]
     chosen = None
     for name in preferred_order:
@@ -132,7 +128,7 @@ def extract_top25_from_rankings(r_json: dict) -> List[Tuple[int, str, str]]:
         return []
     poll_name = chosen.get("name") or "Unknown Poll"
     out = []
-    for r in (chosen.get("ranks") or [])[:25]:
+    for r in (chosen.get("ranks") or [])[:25]:  # top 25 only
         t = r.get("team") or {}
         team_name = (
             t.get("displayName")
@@ -146,11 +142,7 @@ def extract_top25_from_rankings(r_json: dict) -> List[Tuple[int, str, str]]:
         out.append((int(r.get("current", 0) or 0), team_name, poll_name))
     return out
 
-def iter_full_season_weeks(year: int = 2025) -> List[Tuple[int, int]]:
-    """
-    Returns a list of (seasontype, week) pairs to attempt for a season.
-    We don't rely on ESPN's calendar; we brute-force a safe range.
-    """
+def iter_full_season_weeks(year: int = 2025) -> List[Tuple[int, int]]:  # generate (seasontype, week) pairs for a full college football season
     pairs = []
     for w in range(1, 20 + 1):
         pairs.append((2, w))

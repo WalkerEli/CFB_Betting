@@ -7,19 +7,19 @@ from .base import Base
 
 ALLOWED_LEGS = {1, 3, 5, 7}
 
-class SlipStatus(PyEnum):
+class SlipStatus(PyEnum):   # internal status
     PENDING = "PENDING"
     WON = "WON"
     LOST = "LOST"
     SETTLED = "SETTLED"
 
-class LegResult(PyEnum):
+class LegResult(PyEnum):    # from user perspective
     PENDING = "PENDING"
     WIN = "WIN"
     LOSS = "LOSS"
-    PUSH = "PUSH"  # not used yet, but handy
+    PUSH = "PUSH"  
 
-class BetSlip(Base):
+class BetSlip(Base):    # bet slip with multiple legs
     __tablename__ = "bet_slips"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -39,7 +39,7 @@ class BetSlip(Base):
         losses = sum(1 for l in self.legs if l.result == LegResult.LOSS)
         return wins, losses
 
-class BetLeg(Base):
+class BetLeg(Base):   # individual bet leg within a slip
     __tablename__ = "bet_legs"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
